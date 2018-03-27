@@ -1,3 +1,3 @@
 ```bash
-clj --main cljs.main --repl
+clojure -m cljs.main -c qwircl.core --repl
 ```
