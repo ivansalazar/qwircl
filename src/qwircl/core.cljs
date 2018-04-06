@@ -2,24 +2,35 @@
   (:require [quil.core :as q :include-macros true]
             [quil.middleware :as m]))
 
-(def width 500)
-(def height 500)
+; (in-ns 'qwircl.core)
+; (require '[quil.middleware :as m])
+; (require '[quil.core :as q :include-macros true])
+
 (def tiles 25)
-(def size 20)
+(def size 30)
+(def header (* 1.5 size))
+(def width (* size tiles))
+(def height width)
+(def background-color [211 211 211])
+(def state {:grid (-> (vec (repeat tiles (vec (repeat tiles nil))))
+                      (assoc-in [3 3] {:color :green :shape :cross})) 
+            :turn :player1
+            :player1 {:hand [{:color :green :shape :diamond} 
+                             {:color :purple :shape :circle}
+                             {:color :yellow :shape :rectangle}
+                             {:color :blue :shape :star}
+                             {:color :red :shape :clover}
+                             {:color :orange :shape :cross}]
+                      :name "Name"}})
 
 (defn setup []
-  ; Set frame rate to 30 frames per second.
-  (q/frame-rate 30)
-  ; Set color mode to HSB (HSV) instead of default RGB.
-  (q/color-mode :hsb)
-  ; setup function returns initial state. It contains
-  ; the empty grid of tiles
-  (vec (repeat tiles (vec (repeat tiles nil)))))
+  ; Initial state. It contains
+  ; the grid of tiles with an example and
+  ; just one player with some tiles in their hand
+  state)
 
 (defn update-state [state]
-  ; Update sketch state by changing circle color and position.
-  ;; {:color (mod (+ (:color state) 0.7) 255)
-  ;;  :angle (+ (:angle state) 0.1)}
+  ; nothing yet
   state)
 
 (defn click-event [state event]
@@ -43,13 +54,90 @@
 ;;       ; Draw the circle.
 ;;       (q/ellipse x y 100 100))))
 
+(defn set-color [color]
+  (apply q/fill 
+         (condp = color 
+           :green [0 120 0]
+           :blue [135 206 250]
+           :purple [120 0 120]
+           :red [120 0 0]
+           :orange [255 165 0]
+           :yellow [255 255 0]
+           :black [0 0 0]
+           ; [0 255 255]
+           background-color)))
+
+(defn draw-black-background [x y]
+  (set-color :black)
+  (q/rect (* size x) (* size y) size size))
+
+(defn draw-tile [x y tile]
+  (let [middle (/ size 2)
+        quarter (* size 0.25)
+        eighth (* 0.5 quarter)]
+    (draw-black-background x y)
+    (set-color (tile :color))
+    (q/no-stroke)
+    (q/with-translation [(* size x) (* size y)]
+      (condp = (tile :shape)
+        :clover (do
+                  (q/ellipse middle (/ size 3) quarter quarter)
+                  (q/ellipse (/ size 3) middle quarter quarter)
+                  (q/ellipse middle (* size (/ 2 3)) quarter quarter)
+                  (q/ellipse (* size (/ 2 3)) middle quarter quarter)
+                  (q/ellipse middle middle quarter quarter))
+        :star (do 
+                (q/triangle middle 0 
+                            size (* 0.75 size)
+                            0 (* 0.75 size))
+                (q/triangle middle size
+                            0 (* 0.25 size)
+                            size (* 0.25 size)))
+        :cross (do
+                 (q/quad quarter 0
+                         (- size quarter) 0
+                         (- size quarter) size
+                         quarter size)
+                 (q/quad 0 quarter
+                         0 (- size quarter)
+                         size (- size quarter)
+                         size quarter))
+        :circle (q/ellipse middle middle (* 0.75 size) (* 0.75 size))
+        :diamond (q/quad middle quarter 
+                         (- size quarter) middle
+                         middle (- size quarter)
+                         quarter middle)
+        :rectangle (q/rect (/ middle 2) (/ middle 2) middle middle)))
+    ; (q/stroke 0 0 0)
+    (q/no-stroke)
+    (set-color :background)))
+
+(defn draw-empty-space [x y]
+  (set-color :background)
+  (q/rect (* size x) (* size y) size size))
+
+(defn draw-grid [grid]
+  (q/with-translation [0 header]
+    (doseq [x (range tiles) 
+            y (range tiles)]
+      (if-let [tile (get-in grid [x y])]
+        (draw-tile x y tile)
+        (draw-empty-space x y)))))
+
+(defn draw-header [player]
+  (q/fill 0 0 0)
+  (q/text (:name player) 10 header)
+  (dotimes [x (count (:hand player))]
+    (draw-tile x 0 ((:hand player) x)))
+  (apply q/fill background-color))
+
 (defn draw-state [state]
+  (q/frame-rate 120)
   (q/background 240)
-  (q/fill 0 255 255)
-  (q/stroke 0 0 0)
-  (doseq [x (range tiles) 
-          y (range tiles)]
-    (q/rect (* size x) (* size y) size size)))
+  (apply q/fill background-color)
+  (q/no-stroke)
+  (draw-header ((:turn state) state))
+  (draw-grid (:grid state)))
 
 ; hacky way of replacing the default cljs.main page with a canvas for quil
 (def ^:const canvas-id "sketch")
@@ -61,13 +149,14 @@
 ; start quil
 (q/defsketch hello-world
     :host canvas-id
-    :size [width height]
+    :size [width (+ header height)]
     ; setup function called only once, during sketch initialization.
     :setup setup
     ; update-state is called on each iteration before draw-state.
     :update update-state
     :draw draw-state
     :mouse-clicked click-event
+    :mouse-dragged nil
     ; This sketch uses functional-mode middleware.
     ; Check quil wiki for more info about middlewares and particularly
     ; fun-mode.
