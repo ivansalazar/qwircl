@@ -55,17 +55,17 @@
 ;;       (q/ellipse x y 100 100))))
 
 (defn set-color [color]
-  (apply q/fill 
-         (condp = color 
-           :green [0 120 0]
-           :blue [135 206 250]
-           :purple [120 0 120]
-           :red [120 0 0]
-           :orange [255 165 0]
-           :yellow [255 255 0]
-           :black [0 0 0]
-           ; [0 255 255]
-           background-color)))
+  (q/fill 
+   (condp = color 
+     :green [0 120 0]
+     :blue [135 206 250]
+     :purple [120 0 120]
+     :red [120 0 0]
+     :orange [255 165 0]
+     :yellow [255 255 0]
+     :black [0 0 0]
+     ; [0 255 255]
+     background-color)))
 
 (defn draw-black-background [x y]
   (set-color :black)
@@ -74,15 +74,16 @@
 (defn draw-tile [x y tile]
   (let [middle (/ size 2)
         quarter (* size 0.25)
-        eighth (* 0.5 quarter)]
+        eighth (* 0.5 quarter)
+        third (/ size 3)]
     (draw-black-background x y)
     (set-color (tile :color))
     (q/no-stroke)
     (q/with-translation [(* size x) (* size y)]
       (condp = (tile :shape)
         :clover (do
-                  (q/ellipse middle (/ size 3) quarter quarter)
-                  (q/ellipse (/ size 3) middle quarter quarter)
+                  (q/ellipse middle third quarter quarter)
+                  (q/ellipse third middle quarter quarter)
                   (q/ellipse middle (* size (/ 2 3)) quarter quarter)
                   (q/ellipse (* size (/ 2 3)) middle quarter quarter)
                   (q/ellipse middle middle quarter quarter))
@@ -91,8 +92,8 @@
                             size (* 0.75 size)
                             0 (* 0.75 size))
                 (q/triangle middle size
-                            0 (* 0.25 size)
-                            size (* 0.25 size)))
+                            0 quarter
+                            size quarter))
         :cross (do
                  (q/quad quarter 0
                          (- size quarter) 0
@@ -107,8 +108,7 @@
                          (- size quarter) middle
                          middle (- size quarter)
                          quarter middle)
-        :rectangle (q/rect (/ middle 2) (/ middle 2) middle middle)))
-    ; (q/stroke 0 0 0)
+        :rectangle (q/rect quarter quarter middle middle)))
     (q/no-stroke)
     (set-color :background)))
 
@@ -125,16 +125,16 @@
         (draw-empty-space x y)))))
 
 (defn draw-header [player]
-  (q/fill 0 0 0)
+  (set-color :black)
   (q/text (:name player) 10 header)
   (dotimes [x (count (:hand player))]
     (draw-tile x 0 ((:hand player) x)))
-  (apply q/fill background-color))
+  (set-color :background))
 
 (defn draw-state [state]
   (q/frame-rate 120)
   (q/background 240)
-  (apply q/fill background-color)
+  (set-color :background)
   (q/no-stroke)
   (draw-header ((:turn state) state))
   (draw-grid (:grid state)))
