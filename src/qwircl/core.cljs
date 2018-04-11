@@ -55,7 +55,7 @@
 ;;       (q/ellipse x y 100 100))))
 
 (defn set-color [color]
-  (q/fill 
+  (apply q/fill 
    (condp = color 
      :green [0 120 0]
      :blue [135 206 250]
