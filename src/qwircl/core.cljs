@@ -13,13 +13,13 @@
 (def height width)
 (def background-color [211 211 211])
 (def state {:grid (-> (vec (repeat tiles (vec (repeat tiles nil))))
-                      (assoc-in [3 3] {:color :green :shape :cross})) 
+                      (assoc-in [3 3] {:color :green :shape :cross :highlighted? true})) 
             :turn :player1
             :player1 {:hand [{:color :green :shape :diamond} 
                              {:color :purple :shape :circle}
-                             {:color :yellow :shape :rectangle}
+                             {:color :yellow :shape :rectangle :highlighted? true}
                              {:color :blue :shape :star}
-                             {:color :red :shape :clover}
+                             {:color :red :shape :clover :highlighted? true}
                              {:color :orange :shape :cross}]
                       :name "Name"}})
 
@@ -33,14 +33,25 @@
   ; nothing yet
   state)
 
-(defn click-event [state event]
-  ; Hacky demo of updating state based on click coordinates.
-  ;; {:color (mod (:x event) 255)
-  ;;  :angle (:y event)}
-  state)
+(defn to-position [event]
+  ; x is easy, but for y we need to take the header
+  ; into account
+  (let [x (int (/ (:x event) size))
+        r (:y event)]
+    (if (<= r header)
+      {:in :hand :coordinates [x]}
+      {:in :grid :coordinates [x (int (/ (- r header) size))]}))) 
 
-(defn set-color [color]
-  (apply q/fill 
+(defn click-event [state event]
+  (let [{:keys [in coordinates]} (to-position event)
+        player (:turn state)]
+    (let [hand (get-in state [player :hand])
+          [x y] coordinates]
+      (if (= in :hand)
+        (update-in state [player :hand x :highlighted?] not)
+        (update-in state [:grid x y :highlighted?] not)))))
+
+(defn get-color [color]
    (condp = color 
      :green [0 120 0]
      :blue [135 206 250]
@@ -49,18 +60,30 @@
      :orange [255 165 0]
      :yellow [255 255 0]
      :black [0 0 0]
-     background-color)))
+     :pink [255 192 203]
+     background-color))
 
-(defn draw-black-background [x y]
-  (set-color :black)
-  (q/rect (* size x) (* size y) size size))
+(defn set-color [color]
+  (apply q/fill (get-color color)))
+
+(defn draw-background [x y highlighted?]
+  (if highlighted?
+    (do 
+      (set-color :background)
+      (q/stroke-weight 2)
+      (apply q/stroke (get-color :red))
+      (q/rect (* size x) (* size y) size size 8)
+      (q/no-stroke))
+    (do 
+      (set-color :black)
+      (q/rect (* size x) (* size y) size size))))
 
 (defn draw-tile [x y tile]
   (let [half (/ size 2)
         quarter (* size 0.25)
         eighth (* 0.5 quarter)
         third (/ size 3)]
-    (draw-black-background x y)
+    (draw-background x y (:highlighted? tile))
     (set-color (tile :color))
     (q/no-stroke)
     (q/with-translation [(* size x) (* size y)]
@@ -90,16 +113,25 @@
     (q/no-stroke)
     (set-color :background)))
 
-(defn draw-empty-space [x y]
-  (set-color :background)
-  (q/rect (* size x) (* size y) size size))
+(defn draw-empty-space 
+  ([x y]
+   (set-color :background)
+   (q/rect (* size x) (* size y) size size))
+  ([x y highlighted]
+   (if highlighted
+     (draw-background x y true)
+     (draw-empty-space x y))))
 
 (defn draw-grid [grid]
   (q/with-translation [0 header]
     (doseq [x (range tiles) 
             y (range tiles)]
-      (if-let [tile (get-in grid [x y])]
-        (draw-tile x y tile)
+      (if-let [cell (get-in grid [x y])]
+        ; the cell could be a tile if it has a shape, draw it 
+        ; if there's no shape, then the cell might be highlighted
+        (if (:shape cell)
+          (draw-tile x y cell)
+          (draw-empty-space x y (:highlighted? cell)))
         (draw-empty-space x y)))))
 
 (defn draw-header [player]
