@@ -8,7 +8,7 @@
 
 (def tiles 25)
 (def size 30)
-(def header (* 1.5 size))
+(def header (* 2 size))
 (def width (* size tiles))
 (def height width)
 (def background-color [211 211 211])
@@ -39,21 +39,6 @@
   ;;  :angle (:y event)}
   state)
 
-;; (defn draw-state [state]
-;;   ; Clear the sketch by filling it with light-grey color.
-;;   (q/background 240)
-;;   ; Set circle color.
-;;   (q/fill (:color state) 255 255)
-;;   ; Calculate x and y coordinates of the circle.
-;;   (let [angle (:angle state)
-;;         x (* 150 (q/cos angle))
-;;         y (* 150 (q/sin angle))]
-;;     ; Move origin point to the center of the sketch.
-;;     (q/with-translation [(/ (q/width) 2)
-;;                          (/ (q/height) 2)]
-;;       ; Draw the circle.
-;;       (q/ellipse x y 100 100))))
-
 (defn set-color [color]
   (apply q/fill 
    (condp = color 
@@ -64,7 +49,6 @@
      :orange [255 165 0]
      :yellow [255 255 0]
      :black [0 0 0]
-     ; [0 255 255]
      background-color)))
 
 (defn draw-black-background [x y]
@@ -72,7 +56,7 @@
   (q/rect (* size x) (* size y) size size))
 
 (defn draw-tile [x y tile]
-  (let [middle (/ size 2)
+  (let [half (/ size 2)
         quarter (* size 0.25)
         eighth (* 0.5 quarter)
         third (/ size 3)]
@@ -82,33 +66,27 @@
     (q/with-translation [(* size x) (* size y)]
       (condp = (tile :shape)
         :clover (do
-                  (q/ellipse middle third quarter quarter)
-                  (q/ellipse third middle quarter quarter)
-                  (q/ellipse middle (* size (/ 2 3)) quarter quarter)
-                  (q/ellipse (* size (/ 2 3)) middle quarter quarter)
-                  (q/ellipse middle middle quarter quarter))
+                  (q/ellipse half third quarter quarter)
+                  (q/ellipse third half quarter quarter)
+                  (q/ellipse half (* size (/ 2 3)) quarter quarter)
+                  (q/ellipse (* size (/ 2 3)) half quarter quarter)
+                  (q/ellipse half half quarter quarter))
         :star (do 
-                (q/triangle middle 0 
+                (q/triangle half 0 
                             size (* 0.75 size)
                             0 (* 0.75 size))
-                (q/triangle middle size
+                (q/triangle half size
                             0 quarter
                             size quarter))
         :cross (do
-                 (q/quad quarter 0
-                         (- size quarter) 0
-                         (- size quarter) size
-                         quarter size)
-                 (q/quad 0 quarter
-                         0 (- size quarter)
-                         size (- size quarter)
-                         size quarter))
-        :circle (q/ellipse middle middle (* 0.75 size) (* 0.75 size))
-        :diamond (q/quad middle quarter 
-                         (- size quarter) middle
-                         middle (- size quarter)
-                         quarter middle)
-        :rectangle (q/rect quarter quarter middle middle)))
+                 (q/rect quarter 0 half size)
+                 (q/rect 0 quarter size half))
+        :circle (q/ellipse half half (* 0.75 size) (* 0.75 size))
+        :diamond (q/quad half quarter 
+                         (- size quarter) half
+                         half (- size quarter)
+                         quarter half)
+        :rectangle (q/rect quarter quarter half half)))
     (q/no-stroke)
     (set-color :background)))
 
@@ -126,29 +104,22 @@
 
 (defn draw-header [player]
   (set-color :black)
-  (q/text (:name player) 10 header)
+  (q/text (:name player) 10 (- header 10))
   (dotimes [x (count (:hand player))]
     (draw-tile x 0 ((:hand player) x)))
   (set-color :background))
 
 (defn draw-state [state]
-  (q/frame-rate 120)
   (q/background 240)
   (set-color :background)
   (q/no-stroke)
   (draw-header ((:turn state) state))
   (draw-grid (:grid state)))
 
-; hacky way of replacing the default cljs.main page with a canvas for quil
-(def ^:const canvas-id "sketch")
-(def ^:const canvas (.createElement js/document "canvas"))
-(.setAttribute canvas "id" canvas-id)
-(.appendChild (.-body js/document) canvas)
-(.removeChild (.-body js/document) (.querySelector js/document "#app"))
-
-; start quil
-(q/defsketch hello-world
-    :host canvas-id
+; this function is called in resources/public/index.html
+(defn ^:export run-sketch []
+  (q/defsketch qwircl
+    :host "qwircl"
     :size [width (+ header height)]
     ; setup function called only once, during sketch initialization.
     :setup setup
@@ -160,4 +131,7 @@
     ; This sketch uses functional-mode middleware.
     ; Check quil wiki for more info about middlewares and particularly
     ; fun-mode.
-    :middleware [m/fun-mode])
+    :middleware [m/fun-mode]))
+
+; uncomment this line to reset the sketch:
+; (run-sketch)
