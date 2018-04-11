@@ -79,8 +79,8 @@
                             0 quarter
                             size quarter))
         :cross (do
-                 (q/rect quarter 0 half size)
-                 (q/rect 0 quarter size half))
+                 (q/rect (- half eighth) eighth quarter (- size quarter))
+                 (q/rect eighth (- half eighth) (- size quarter) quarter))
         :circle (q/ellipse half half (* 0.75 size) (* 0.75 size))
         :diamond (q/quad half quarter 
                          (- size quarter) half
