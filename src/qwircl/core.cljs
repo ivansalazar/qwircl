@@ -1,6 +1,7 @@
 (ns qwircl.core
   (:require [quil.core :as q :include-macros true]
-            [quil.middleware :as m]))
+            [quil.middleware :as m]
+            [clojure.string :as s]))
 
 ; (in-ns 'qwircl.core)
 ; (require '[quil.middleware :as m])
@@ -8,20 +9,37 @@
 
 (def tiles 25)
 (def size 30)
-(def header (* 2 size))
+(def header (* 1.8 size))
+(def header-translation [10 11])
 (def width (* size tiles))
 (def height width)
 (def background-color [211 211 211])
 (def state {:grid (-> (vec (repeat tiles (vec (repeat tiles nil))))
-                      (assoc-in [3 3] {:color :green :shape :cross :highlighted? true})) 
+                      (assoc-in [3 3] {:color :green :shape :cross})) 
             :turn :player1
-            :player1 {:hand [{:color :green :shape :diamond} 
-                             {:color :purple :shape :circle}
-                             {:color :yellow :shape :rectangle :highlighted? true}
-                             {:color :blue :shape :star}
-                             {:color :red :shape :clover :highlighted? true}
-                             {:color :orange :shape :cross}]
-                      :name "Name"}})
+            :pda {:s :initial} 
+            :my {:hand [{:color :green :shape :diamond} 
+                        {:color :purple :shape :circle}
+                        {:color :red :shape :clover}
+                        {:color :orange :shape :cross}]
+                 :name "Name"}})
+
+(def dimensions 
+  {:hand {:x (first header-translation) 
+          :w (* 6 size) 
+          :y (second header-translation) 
+          :h size}
+   :grid {:x 0 :w width :y header :h height}
+   :submit {:x (+ 26 (* 6 size))
+            :w 90
+            :y 12
+            :h 30
+            :r 8}
+   :undo {:x (+ 130 (* 6 size))
+          :w 90
+          :y 12
+          :h 30
+          :r 8}})
 
 (defn setup []
   ; Initial state. It contains
@@ -33,27 +51,106 @@
   ; nothing yet
   state)
 
-(defn to-position [event]
-  ; x is easy, but for y we need to take the header
-  ; into account
-  (let [x (int (/ (:x event) size))
-        r (:y event)]
-    (if (<= r header)
-      {:in :hand :coordinates [x]}
-      {:in :grid :coordinates [x (int (/ (- r header) size))]}))) 
+(defn inside-dimensions? [xp yp {:keys [x y w h]}]
+  (and 
+   (<= x xp (+ x w))
+   (<= y yp (+ y h))))
+
+(defn get-clicked [x y]
+  (first (filter #(inside-dimensions? x y (% dimensions)) [:hand :grid :submit :undo])))
+
+(defn translate-hand [xp hand]
+  (let [x (int (/ (- xp (first header-translation)) size))]
+    (when (and (<= 0 x) (< x (count hand)))
+      [x])))
+
+(defn translate-grid [x y]
+  [(int (/ x size)) (int (/ (- y header) size))])
+
+(defn translate-event [state {:keys [x y]}]
+  (condp = (get-clicked x y)
+    :hand (when-let [h (translate-hand x (get-in state [:my :hand]))] 
+            {:action :hand-clicked :clicked h})
+    :grid {:action :grid-clicked :clicked (translate-grid x y)}
+    :submit {:action :submit}
+    :undo {:action :undo}
+    {:x x :y y}))
+
+(defn toggle-highlight [{{:keys [hand] :as player} :player :as state} event]
+  (let [{:keys [action] [x y] :clicked} (translate-event hand event)]
+    (cond 
+      (= action :hand-clicked) (update-in state [player :hand x :highlighted?] not)
+      (= action :grid-clicked) (update-in state [:grid x y :highlighted?] not))))
+
+(defn empty-location? [[x y] grid]
+  (let [location (get-in grid [x y])]
+    (and 
+     (nil? (:color location))
+     (nil? (:shape location)))))
+
+(defn valid-play? [state clicked]
+  (and 
+   (empty-location? clicked (:grid state))
+   true))
+
+;; push-down automaton for managing state for
+;; picking and playing tiles
+(defn run-pda 
+  [{{:keys [s hand positions] :as pda} :pda :as state} {:keys [action clicked]}]
+  (condp = s
+    :initial 
+    (cond
+      (= action :hand-clicked) {:s :picking :hand [clicked] :positions []}
+      :else {:s :initial})
+    :picking 
+    (cond
+      (and 
+       (= action :hand-clicked)
+       (empty? positions)
+       (not-any? #(= clicked %) hand)) {:s :picking 
+                                        :hand (conj hand clicked)
+                                        :positions []}
+      (and
+       (= action :trade-clicked)
+       (empty? positions)) {:s :traded :hand hand}
+      (and
+       (= action :grid-clicked)
+       (= 1 (count hand))
+       (not-any? #(= clicked (:coordinates %)) positions)
+       (valid-play? state clicked)) {:s :playing 
+                                     :hand []
+                                     :positions (conj positions {:coordinates clicked
+                                                                 :hand (peek hand)})}
+      (= action :undo) (if (= 1 (count hand))
+                         {:s :initial}
+                         {:s :picking :hand (pop hand) :positions positions})
+      :else {:s :picking :hand hand :positions positions})
+    :playing
+    (cond
+      (and
+       (= action :hand-clicked)
+       (not-any? #(= clicked (:hand %)) positions)) {:s :picking 
+                                                     :hand (conj hand clicked)
+                                                     :positions positions}
+      (= action :play-clicked) {:s :played :positions positions}
+      (= action :undo) (if (= 1 (count positions))
+                         {:s :initial}
+                         {:s :playing :hand hand :positions (pop positions)})
+      :else {:s :playing :hand hand :positions positions})))
 
 (defn click-event [state event]
-  (let [{:keys [in coordinates]} (to-position event)
-        player (:turn state)]
-    (let [hand (get-in state [player :hand])
-          [x y] coordinates]
-      (if (= in :hand)
-        (update-in state [player :hand x :highlighted?] not)
-        (update-in state [:grid x y :highlighted?] not)))))
+  (let [click (translate-event state event)]
+    (-> state
+        (assoc :pda (run-pda state click))
+        ; (assoc :debug (str click " -> " (run-pda state click)))
+        )))
 
 (defn get-color [color]
    (condp = color 
+     :white [255 255 255]
+     :light-grey [220 220 220]
      :green [0 120 0]
+     :light-green [199 234 70]
      :blue [135 206 250]
      :purple [120 0 120]
      :red [120 0 0]
@@ -61,6 +158,7 @@
      :yellow [255 255 0]
      :black [0 0 0]
      :pink [255 192 203]
+     :background background-color
      background-color))
 
 (defn set-color [color]
@@ -134,18 +232,60 @@
           (draw-empty-space x y (:highlighted? cell)))
         (draw-empty-space x y)))))
 
-(defn draw-header [player]
+(defn button-action [button pda]
+  (condp = button
+    :undo :undo
+    :submit (condp = (:s pda)
+              :picking (if (empty? (:positions pda)) 
+                         :trade
+                         :submit)
+              :playing :submit
+              :submit)
+    :submit))
+
+(defn button-status [button pda]
+  (condp = (:s pda)
+    :initial :inactive 
+    :playing :active
+    :picking (condp = button 
+               :submit :active
+               :undo :active
+               :inactive)))
+
+(defn draw-button [button x pda]
+  (let [status (button-status button pda)]
+    (set-color (condp = status
+                 :inactive :background
+                 :active :light-green))
+    (apply q/rect (map #(get-in dimensions [button %]) [:x :y :w :h :r]))
+    (set-color (condp = status
+                 :inactive :white
+                 :active :black))
+    (-> (button-action button pda)
+        name
+        s/capitalize
+        (q/text x 31))))
+
+(defn draw-header [state]
+  (let [pda (get state :pda)]
+    (draw-button :submit 232 pda)
+    (draw-button :undo 340 pda))
   (set-color :black)
-  (q/text (:name player) 10 (- header 10))
-  (dotimes [x (count (:hand player))]
-    (draw-tile x 0 ((:hand player) x)))
+  (q/text (str "Playing: " (get-in state [:my :name])
+               ;" debug: " (get-in state [:debug])
+               )
+          415 30)
+  (q/with-translation header-translation
+    (let [hand (get-in state [:my :hand])]
+      (dotimes [x (count hand)]
+        (draw-tile x 0 (get hand x)))))
   (set-color :background))
 
 (defn draw-state [state]
   (q/background 240)
   (set-color :background)
   (q/no-stroke)
-  (draw-header ((:turn state) state))
+  (draw-header state)
   (draw-grid (:grid state)))
 
 ; this function is called in resources/public/index.html
