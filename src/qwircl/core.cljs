@@ -76,12 +76,6 @@
     :undo {:action :undo}
     {:x x :y y}))
 
-(defn toggle-highlight [{{:keys [hand] :as player} :player :as state} event]
-  (let [{:keys [action] [x y] :clicked} (translate-event hand event)]
-    (cond 
-      (= action :hand-clicked) (update-in state [player :hand x :highlighted?] not)
-      (= action :grid-clicked) (update-in state [:grid x y :highlighted?] not))))
-
 (defn empty-location? [[x y] grid]
   (let [location (get-in grid [x y])]
     (and 
@@ -141,9 +135,7 @@
 (defn click-event [state event]
   (let [click (translate-event state event)]
     (-> state
-        (assoc :pda (run-pda state click))
-        ; (assoc :debug (str click " -> " (run-pda state click)))
-        )))
+        (assoc :pda (run-pda state click)))))
 
 (defn get-color [color]
    (condp = color 
@@ -272,7 +264,7 @@
     (draw-button :undo 340 pda))
   (set-color :black)
   (q/text (str "Playing: " (get-in state [:my :name])
-               ;" debug: " (get-in state [:debug])
+               ; " debug: " (get-in state [:debug])
                )
           415 30)
   (q/with-translation header-translation
@@ -281,12 +273,30 @@
         (draw-tile x 0 (get hand x)))))
   (set-color :background))
 
+(defn draw-pda [state] 
+  (let [{:keys [s hand positions]} (:pda state)]
+    (do 
+      (q/with-translation header-translation
+        (doseq [[h] hand]
+          (draw-empty-space h 0)
+          (as-> state arg
+            (get-in arg [:my :hand h])
+            (assoc arg :highlighted? true)
+            (draw-tile h 0 arg)))
+        (doseq [{[h] :hand} positions]
+          (draw-empty-space h 0)))
+      (q/with-translation [0 header]
+        (doseq [{[x y] :coordinates [h] :hand} positions]
+          (let [tile (get-in state [:my :hand h])]
+            (draw-tile x y (assoc tile :highlighted? true))))))))
+
 (defn draw-state [state]
   (q/background 240)
   (set-color :background)
   (q/no-stroke)
   (draw-header state)
-  (draw-grid (:grid state)))
+  (draw-grid (:grid state))
+  (draw-pda state))
 
 ; this function is called in resources/public/index.html
 (defn ^:export run-sketch []
