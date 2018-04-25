@@ -115,9 +115,11 @@
                                      :hand []
                                      :positions (conj positions {:coordinates clicked
                                                                  :hand (peek hand)})}
-      (= action :undo) (if (= 1 (count hand))
-                         {:s :initial}
-                         {:s :picking :hand (pop hand) :positions positions})
+      (= action :undo) (cond
+                         (and 
+                          (= 1 (count hand))
+                          (empty? positions)) {:s :initial}
+                         :else {:s :playing :hand (pop hand) :positions positions})
       :else {:s :picking :hand hand :positions positions})
     :playing
     (cond
