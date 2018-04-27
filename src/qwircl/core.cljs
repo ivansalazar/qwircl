@@ -7,16 +7,21 @@
 (def size 30)
 (def header (* 1.8 size))
 (def header-translation [10 11])
-(def width (* size tiles))
+(def width (* 2 size tiles))
 (def height width)
 (def background-color [211 211 211])
 (def state {:grid (-> (vec (repeat tiles (vec (repeat tiles nil))))
-                      (assoc-in [3 3] {:color :green :shape :cross})) 
+                      (assoc-in [3 3] {:color :green :shape :cross})
+                      (assoc-in [4 3] {:color :green :shape :circle})
+                      (assoc-in [5 3] {:color :green :shape :diamond})
+                      (assoc-in [3 4] {:color :blue :shape :cross})
+                      (assoc-in [5 4] {:color :blue :shape :diamond})) 
             :turn :player1
             :pda {:s :initial} 
-            :my {:hand [{:color :green :shape :diamond} 
-                        {:color :purple :shape :circle}
-                        {:color :red :shape :clover}
+            :my {:hand [{:color :blue :shape :diamond} 
+                        {:color :blue :shape :circle}
+                        {:color :blue :shape :clover}
+                        {:color :blue :shape :cross}
                         {:color :orange :shape :cross}]
                  :name "Name"}})
 
@@ -24,7 +29,6 @@
   state)
 
 (defn update-state [state]
-  ; nothing yet
   state)
 
 (defn inside-dimensions? [xp yp {:keys [x y w h]}]
@@ -54,6 +58,7 @@
           :y 12
           :h 30
           :r 8}})
+
 (defn get-clicked [x y]
   (first (filter #(inside-dimensions? x y (% dimensions)) [:hand :grid :submit :undo])))
 
@@ -65,9 +70,9 @@
 (defn translate-grid [x y]
   [(int (/ x size)) (int (/ (- y header) size))])
 
-(defn translate-event [state {:keys [x y] :as event}]
+(defn translate-event [{{my-hand :hand} :my} {:keys [x y] :as event}]
   (condp = (get-clicked x y)
-    :hand (when-let [h (translate-hand x (get-in state [:my :hand]))] 
+    :hand (when-let [h (translate-hand x my-hand)] 
             {:action :hand-clicked :clicked h})
     :grid {:action :grid-clicked :clicked (translate-grid x y)}
     :submit {:action :submit}
@@ -76,14 +81,80 @@
 
 (defn empty-location? [[x y] grid]
   (let [location (get-in grid [x y])]
-    (and 
+    (or
      (nil? (:color location))
      (nil? (:shape location)))))
 
-(defn valid-play? [state clicked]
-  (and 
-   (empty-location? clicked (:grid state))
-   true))
+(defn same-line? [positions [x y]]
+  (or (empty? positions)
+      (every? #(= (first (:coordinates %)) x)
+              positions)
+      (every? #(= (second (:coordinates %)) y) 
+              positions)))
+
+(def transformations {:horizontal {:x [dec inc] :y [identity identity]}
+                      :vertical {:x [identity identity] :y [dec inc]}})
+(defn get-neighbors 
+  ([grid [x y] f g initial]
+   (loop [i (f x)
+          j (g y)
+          acc initial]
+     (if-let [cell (get-in grid [i j])]
+       (recur (f i) (g j) (conj acc cell))
+       acc)))
+  ([grid clicked direction]
+   (let [[f1 f2 g1 g2] (map #(get-in transformations (apply (partial conj [direction]) %))
+                            [[:x 0] [:x 1] [:y 0] [:y 1]])]
+     (get-neighbors grid clicked f1 g1  
+                    (get-neighbors grid clicked f2 g2 [])))))
+
+;; TODO: only use clicked where appropriate, otherwise use "coordinate"
+(defn every-neighbor? [pred? grid clicked direction]
+  (->> (get-neighbors grid clicked direction)
+       (every? pred?)))
+
+(defn same-shape? [grid clicked tile direction]
+  (every-neighbor? #(= (:shape tile) (:shape %)) grid clicked direction))
+
+(defn same-color? [grid clicked tile direction]
+  (every-neighbor? #(= (:color tile) (:color %)) grid clicked direction))
+
+(defn touches-some-tile? [[x y] grid]
+  (let [uc [x (dec y)]
+        dc [x (inc y)]
+        lc [(dec x) y]
+        rc [(inc x) y]]
+    (some #(get-in grid %) [uc dc lc rc])))
+
+(defn all-unique? [grid clicked tile direction]
+  (let [ts (conj (get-neighbors grid clicked direction) tile)]
+    (= (count ts)
+       (count (set ts)))))
+
+(defn grid-with-positions [grid positions hand]
+  (reduce #(assoc-in %1 (:coordinates %2) (hand (first (:hand %2)))) grid positions))
+
+(defn valid-play? 
+  [{:keys [grid] {:keys [positions hand]} :pda {my-hand :hand} :my} clicked]
+  (let [previous-grid (grid-with-positions grid positions my-hand)
+        new-grid (grid-with-positions grid 
+                                      (conj positions {:coordinates clicked
+                                                       :hand (peek hand)})
+                                      my-hand)
+        tile (my-hand (first (peek hand)))]
+    (and 
+     (empty-location? clicked previous-grid)
+     (touches-some-tile? clicked previous-grid)
+     (same-line? positions clicked)
+     (and 
+      (or 
+       (same-shape? new-grid clicked tile :vertical)
+       (same-color? new-grid clicked tile :vertical))
+      (or 
+       (same-shape? new-grid clicked tile :horizontal)
+       (same-color? new-grid clicked tile :horizontal)))
+     (all-unique? new-grid clicked tile :horizontal)
+     (all-unique? new-grid clicked tile :vertical))))
 
 ;; push-down automaton for managing state for
 ;; picking and playing tiles
@@ -135,7 +206,8 @@
 (defn click-event [state event]
   (let [click (translate-event state event)]
     (-> state
-        (assoc :pda (run-pda state click)))))
+        (assoc :pda (run-pda state click))
+        (assoc :debug click))))
 
 (defn get-color [color]
    (condp = color 
@@ -273,19 +345,18 @@
       (draw-tile x 0 (get hand x))))
   (set-color :background))
 
-(defn draw-pda [{{:keys [s hand positions]} :pda :as state}] 
+(defn draw-pda [{{my-hand :hand} :my {:keys [s hand positions]} :pda :as state}] 
   (q/with-translation header-translation
     (doseq [[h] hand]
       (draw-empty-space h 0)
-      (as-> state arg
-        (get-in arg [:my :hand h])
+      (as-> (my-hand h) arg
         (assoc arg :highlighted? true)
         (draw-tile h 0 arg)))
     (doseq [{[h] :hand} positions]
       (draw-empty-space h 0)))
   (q/with-translation [0 header]
     (doseq [{[x y] :coordinates [h] :hand} positions]
-      (let [tile (get-in state [:my :hand h])]
+      (let [tile (my-hand h)]
         (draw-tile x y (assoc tile :highlighted? true))))))
 
 (defn draw-state [state]
