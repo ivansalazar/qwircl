@@ -11,16 +11,21 @@
 (def size 30)
 (def header (* 1.8 size))
 (def header-translation [10 11])
-(def width (* size tiles))
+(def width (* 2 size tiles))
 (def height width)
 (def background-color [211 211 211])
 (def state {:grid (-> (vec (repeat tiles (vec (repeat tiles nil))))
-                      (assoc-in [3 3] {:color :green :shape :cross})) 
+                      (assoc-in [3 3] {:color :green :shape :cross})
+                      (assoc-in [4 3] {:color :green :shape :circle})
+                      (assoc-in [5 3] {:color :green :shape :diamond})
+                      (assoc-in [3 4] {:color :blue :shape :cross})
+                      (assoc-in [5 4] {:color :blue :shape :diamond})) 
             :turn :player1
             :pda {:s :initial} 
-            :my {:hand [{:color :green :shape :diamond} 
-                        {:color :purple :shape :circle}
-                        {:color :red :shape :clover}
+            :my {:hand [{:color :blue :shape :diamond} 
+                        {:color :blue :shape :circle}
+                        {:color :blue :shape :clover}
+                        {:color :blue :shape :cross}
                         {:color :orange :shape :cross}]
                  :name "Name"}})
 
@@ -78,14 +83,78 @@
 
 (defn empty-location? [[x y] grid]
   (let [location (get-in grid [x y])]
-    (and 
+    (or
+     true
      (nil? (:color location))
      (nil? (:shape location)))))
 
-(defn valid-play? [state clicked]
-  (and 
-   (empty-location? clicked (:grid state))
-   true))
+(defn same-line? [positions [x y]]
+  (or (empty? positions)
+      (every? #(= (first (:coordinates %)) x)
+              positions)
+      (every? #(= (second (:coordinates %)) y) 
+              positions)))
+
+(def transformations {:horizontal {:x [dec inc] :y [identity identity]}
+                      :vertical {:x [identity identity] :y [dec inc]}})
+(defn reduce-neighbors 
+  ([grid [x y] f g h initial]
+   (loop [i (f x)
+          j (g y)
+          acc initial]
+     (if-let [cell (get-in grid [i j])]
+       (recur (f i) (g j) (h acc cell))
+       acc)))
+  ([grid clicked h initial direction]
+   (let [f1 (get-in transformations [direction :x 0])
+         f2 (get-in transformations [direction :x 1])
+         g1 (get-in transformations [direction :y 0])
+         g2 (get-in transformations [direction :y 1])]
+     (reduce-neighbors grid clicked f1 g1 h 
+                       (reduce-neighbors grid clicked f2 g2 h initial)))))
+
+(defn same-shape? [grid clicked tile direction]
+  (reduce-neighbors grid clicked #(and %1 (= (:shape tile) (:shape %2))) true direction))
+
+(defn same-color? [grid clicked tile direction]
+  (reduce-neighbors grid clicked #(and %1 (= (:color tile) (:color %2))) true direction))
+
+(defn touches-some-tile? [[x y] grid]
+  (let [uc (get-in grid [x (dec y)])
+        dc (get-in grid [x (inc y)])
+        lc (get-in grid [(dec x) y])
+        rc (get-in grid [(inc x) y])]
+    (or uc dc lc rc)))
+
+(defn all-unique? [grid clicked tile direction]
+  (let [ts (reduce-neighbors grid clicked conj [tile] direction)]
+    (= (count ts)
+       (count (set ts)))))
+
+(defn grid-with-positions [grid positions hand]
+  (reduce #(assoc-in %1 (:coordinates %2) (hand (first (:hand %2)))) grid positions))
+
+(defn valid-play? 
+  [{:keys [grid] {:keys [positions hand]} :pda :as state} clicked]
+  (let [previous-grid (grid-with-positions grid positions (get-in state [:my :hand]))
+        new-grid (grid-with-positions grid 
+                                      (conj positions {:coordinates clicked
+                                                       :hand (peek hand)})
+                                      (get-in state [:my :hand]))
+        tile (get-in state [:my :hand (first (peek hand))])]
+    (and 
+     (empty-location? clicked previous-grid)
+     (touches-some-tile? clicked previous-grid)
+     (same-line? positions clicked)
+     (and 
+      (or 
+       (same-shape? new-grid clicked tile :vertical)
+       (same-color? new-grid clicked tile :vertical))
+      (or 
+       (same-shape? new-grid clicked tile :horizontal)
+       (same-color? new-grid clicked tile :horizontal)))
+     (all-unique? new-grid clicked tile :horizontal)
+     (all-unique? new-grid clicked tile :vertical))))
 
 ;; push-down automaton for managing state for
 ;; picking and playing tiles
@@ -137,7 +206,8 @@
 (defn click-event [state event]
   (let [click (translate-event state event)]
     (-> state
-        (assoc :pda (run-pda state click)))))
+        (assoc :pda (run-pda state click))
+        (assoc :debug click))))
 
 (defn get-color [color]
    (condp = color 
@@ -265,8 +335,8 @@
     (draw-button :submit 232 pda)
     (draw-button :undo 340 pda))
   (set-color :black)
-  (q/text (str "Playing: " (get-in state [:my :name])
-               ; " debug: " (get-in state [:debug])
+  (q/text (str ; "Playing: " (get-in state [:my :name])
+               " dbg: " (get-in state [:debug])
                )
           415 30)
   (q/with-translation header-translation
