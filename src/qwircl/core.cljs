@@ -3,10 +3,6 @@
             [quil.middleware :as m]
             [clojure.string :as s]))
 
-; (in-ns 'qwircl.core)
-; (require '[quil.middleware :as m])
-; (require '[quil.core :as q :include-macros true])
-
 (def tiles 25)
 (def size 30)
 (def header (* 1.8 size))
@@ -24,6 +20,24 @@
                         {:color :orange :shape :cross}]
                  :name "Name"}})
 
+(defn setup []
+  state)
+
+(defn update-state [state]
+  ; nothing yet
+  state)
+
+(defn inside-dimensions? [xp yp {:keys [x y w h]}]
+  (and 
+   (<= x xp (+ x w))
+   (<= y yp (+ y h))))
+
+;; These represent the dimensions of the different UI components 
+;; that are clickable or relevant in some other way in the sketch.
+;; All of them are constant except for the [:hand :w] dimension
+;; which will change depending on how many tiles are in the actual hand.
+;; This check will be deferred to the translate-hand function where the
+;; state (and the hand) will be available.
 (def dimensions 
   {:hand {:x (first header-translation) 
           :w (* 6 size) 
@@ -40,22 +54,6 @@
           :y 12
           :h 30
           :r 8}})
-
-(defn setup []
-  ; Initial state. It contains
-  ; the grid of tiles with an example and
-  ; just one player with some tiles in their hand
-  state)
-
-(defn update-state [state]
-  ; nothing yet
-  state)
-
-(defn inside-dimensions? [xp yp {:keys [x y w h]}]
-  (and 
-   (<= x xp (+ x w))
-   (<= y yp (+ y h))))
-
 (defn get-clicked [x y]
   (first (filter #(inside-dimensions? x y (% dimensions)) [:hand :grid :submit :undo])))
 
@@ -67,14 +65,14 @@
 (defn translate-grid [x y]
   [(int (/ x size)) (int (/ (- y header) size))])
 
-(defn translate-event [state {:keys [x y]}]
+(defn translate-event [state {:keys [x y] :as event}]
   (condp = (get-clicked x y)
     :hand (when-let [h (translate-hand x (get-in state [:my :hand]))] 
             {:action :hand-clicked :clicked h})
     :grid {:action :grid-clicked :clicked (translate-grid x y)}
     :submit {:action :submit}
     :undo {:action :undo}
-    {:x x :y y}))
+    event))
 
 (defn empty-location? [[x y] grid]
   (let [location (get-in grid [x y])]
@@ -246,12 +244,14 @@
                :undo :active
                :inactive)))
 
+(def button-color
+  {:inactive :background
+   :active :light-green})
 (defn draw-button [button x pda]
   (let [status (button-status button pda)]
-    (set-color (condp = status
-                 :inactive :background
-                 :active :light-green))
-    (apply q/rect (map #(get-in dimensions [button %]) [:x :y :w :h :r]))
+    (set-color (button-color status))
+    (apply q/rect 
+           ((juxt :x :y :w :h :r) (dimensions button)))
     (set-color (condp = status
                  :inactive :white
                  :active :black))
@@ -260,37 +260,33 @@
         s/capitalize
         (q/text x 31))))
 
-(defn draw-header [state]
-  (let [pda (get state :pda)]
-    (draw-button :submit 232 pda)
-    (draw-button :undo 340 pda))
+(defn draw-header [{:keys [pda] {:keys [name hand]} :my :as state}]
+  (draw-button :submit 232 pda)
+  (draw-button :undo 340 pda)
   (set-color :black)
-  (q/text (str "Playing: " (get-in state [:my :name])
+  (q/text (str "Playing: " name
                ; " debug: " (get-in state [:debug])
                )
           415 30)
   (q/with-translation header-translation
-    (let [hand (get-in state [:my :hand])]
-      (dotimes [x (count hand)]
-        (draw-tile x 0 (get hand x)))))
+    (dotimes [x (count hand)]
+      (draw-tile x 0 (get hand x))))
   (set-color :background))
 
-(defn draw-pda [state] 
-  (let [{:keys [s hand positions]} (:pda state)]
-    (do 
-      (q/with-translation header-translation
-        (doseq [[h] hand]
-          (draw-empty-space h 0)
-          (as-> state arg
-            (get-in arg [:my :hand h])
-            (assoc arg :highlighted? true)
-            (draw-tile h 0 arg)))
-        (doseq [{[h] :hand} positions]
-          (draw-empty-space h 0)))
-      (q/with-translation [0 header]
-        (doseq [{[x y] :coordinates [h] :hand} positions]
-          (let [tile (get-in state [:my :hand h])]
-            (draw-tile x y (assoc tile :highlighted? true))))))))
+(defn draw-pda [{{:keys [s hand positions]} :pda :as state}] 
+  (q/with-translation header-translation
+    (doseq [[h] hand]
+      (draw-empty-space h 0)
+      (as-> state arg
+        (get-in arg [:my :hand h])
+        (assoc arg :highlighted? true)
+        (draw-tile h 0 arg)))
+    (doseq [{[h] :hand} positions]
+      (draw-empty-space h 0)))
+  (q/with-translation [0 header]
+    (doseq [{[x y] :coordinates [h] :hand} positions]
+      (let [tile (get-in state [:my :hand h])]
+        (draw-tile x y (assoc tile :highlighted? true))))))
 
 (defn draw-state [state]
   (q/background 240)
