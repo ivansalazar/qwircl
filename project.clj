@@ -21,6 +21,14 @@
               :output-to "resources/public/js/main.js"
               :output-dir "resources/public/js/development"
               :asset-path "js/development"}}
+            {:id "test"
+             :source-paths ["src" "test"]
+             :figwheel true
+             :compiler
+             {:main "qwircl.test-runner"
+              :output-to "resources/public/js/test.js"
+              :output-dir "resources/public/js/test"
+              :asset-path "js/test"}}
             ; minified and bundled build for deployment
             {:id "optimized"
              :source-paths ["src"]
