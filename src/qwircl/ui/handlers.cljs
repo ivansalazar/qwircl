@@ -11,7 +11,7 @@
                  [:hand :grid :submit :undo])))
 
 (defn translate-hand [xp hand]
-  (let [x (int (/ (- xp (:x ui/dimensions)) ui/size))]
+  (let [x (int (/ (- xp (get-in ui/dimensions [:hand :x])) ui/size))]
     (when (and (<= 0 x) (< x (count hand)))
       [x])))
 
@@ -19,7 +19,7 @@
   [(int (/ x ui/size)) (int (/ (- y ui/header) ui/size))])
 
 (defn translate-event [{{my-hand :hand} :my} {:keys [x y] :as event}]
-  (condp = (get-clicked x y)
+  (case (get-clicked x y)
     :hand (when-let [h (translate-hand x my-hand)] 
             {:action :hand-clicked :clicked h})
     :grid {:action :grid-clicked :clicked (translate-grid x y)}

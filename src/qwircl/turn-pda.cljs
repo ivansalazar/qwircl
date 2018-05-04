@@ -4,8 +4,8 @@
 ;; push-down automaton for managing state for
 ;; picking and playing tiles
 (defn run-pda 
-  [{{:keys [s hand positions] :as pda} :pda :as state} {:keys [action clicked]}]
-  (condp = s
+  [{{:keys [s hand positions]} :turn :as state} {:keys [action clicked]}]
+  (case s
     :initial 
     (cond
       (= action :hand-clicked) {:s :picking :hand [clicked] :positions []}

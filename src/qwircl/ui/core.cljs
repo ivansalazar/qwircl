@@ -2,9 +2,9 @@
   (:require [quil.core :as q :include-macros true]
             [clojure.string :as s]))
 
-(def tiles 25)
+(def side 25)
 (def size 30)
-(def width (* 2 size tiles))
+(def width (* 2 size side))
 (def height width)
 (def header (* 1.8 size))
 
@@ -33,7 +33,7 @@
 
 (def background-color [211 211 211])
 (defn get-color [color]
-   (condp = color 
+   (case color 
      :white [255 255 255]
      :light-grey [220 220 220]
      :green [0 120 0]
@@ -72,7 +72,7 @@
     (set-color (tile :color))
     (q/no-stroke)
     (q/with-translation [(* size x) (* size y)]
-      (condp = (tile :shape)
+      (case (tile :shape)
         :clover (do
                   (q/ellipse half third quarter quarter)
                   (q/ellipse third half quarter quarter)
@@ -94,24 +94,24 @@
                          (- size quarter) half
                          half (- size quarter)
                          quarter half)
-        :rectangle (q/rect quarter quarter half half)))
+        :square (q/rect quarter quarter half half)))
     (q/no-stroke)
     (set-color :background)))
 
-(defn button-status [button pda]
-  (condp = (:s pda)
+(defn button-status [button turn]
+  (case (:s turn)
     :initial :inactive 
     :playing :active
-    :picking (condp = button 
+    :picking (case button 
                :submit :active
                :undo :active
                :inactive)))
 
-(defn button-action [button pda]
-  (condp = button
+(defn button-action [button turn]
+  (case button
     :undo :undo
-    :submit (condp = (:s pda)
-              :picking (if (empty? (:positions pda)) 
+    :submit (case (:s turn)
+              :picking (if (empty? (:positions turn)) 
                          :trade
                          :submit)
               :playing :submit
@@ -121,22 +121,23 @@
 (def button-color
   {:inactive :background
    :active :light-green})
-(defn draw-button [button x pda]
-  (let [status (button-status button pda)]
+(def text-color
+  {:inactive :white
+   :active :black})
+(defn draw-button [button x turn]
+  (let [status (button-status button turn)]
     (set-color (button-color status))
     (apply q/rect 
            ((juxt :x :y :w :h :r) (dimensions button)))
-    (set-color (condp = status
-                 :inactive :white
-                 :active :black))
-    (-> (button-action button pda)
+    (set-color (text-color status))
+    (-> (button-action button turn)
         name
         s/capitalize
         (q/text x 31))))
 
-(defn draw-header [{:keys [pda debug] {:keys [name hand]} :my :as state}]
-  (draw-button :submit 232 pda)
-  (draw-button :undo 340 pda)
+(defn draw-header [{:keys [turn debug] {:keys [name hand]} :my :as state}]
+  (draw-button :submit 232 turn)
+  (draw-button :undo 340 turn)
   (set-color :black)
   (q/text (str "Playing: " name
                (if debug 
@@ -159,8 +160,8 @@
 
 (defn draw-grid [grid]
   (q/with-translation [0 header]
-    (doseq [x (range tiles) 
-            y (range tiles)]
+    (doseq [x (range side) 
+            y (range side)]
       (if-let [cell (get-in grid [x y])]
         ; the cell could be a tile if it has a shape, draw it 
         ; if there's no shape, then the cell might be highlighted
@@ -169,7 +170,7 @@
           (draw-empty-space x y (:highlighted? cell)))
         (draw-empty-space x y)))))
 
-(defn draw-pda [{{my-hand :hand} :my {:keys [s hand positions]} :pda :as state}] 
+(defn draw-turn [{{my-hand :hand} :my {:keys [s hand positions]} :turn :as state}] 
   (q/with-translation ((juxt :x :y) (:hand dimensions))
     (doseq [[h] hand]
       (draw-empty-space h 0)
@@ -189,5 +190,5 @@
   (q/no-stroke)
   (draw-header state)
   (draw-grid (:grid state))
-  (draw-pda state))
+  (draw-turn state))
 

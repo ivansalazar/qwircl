@@ -27,7 +27,7 @@
   (grid/every-neighbor? #(= (:color tile) (:color %)) grid location direction))
 
 (defn valid-play? 
-  [{:keys [grid] {:keys [positions hand]} :pda {my-hand :hand} :my} location]
+  [{:keys [grid] {:keys [positions hand]} :turn {my-hand :hand} :my} location]
   (let [previous-grid (grid/with-positions grid positions my-hand)
         new-grid (grid/with-positions 
                    grid 
