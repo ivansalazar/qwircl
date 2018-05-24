@@ -3,6 +3,9 @@
 (defn with-positions [grid positions hand]
   (reduce #(assoc-in %1 (:coordinates %2) (hand (first (:hand %2)))) grid positions))
 
+(defn with-moves [grid {:keys [coordinates hand]} current-hand] ;; Q: from-hand instead of hand???
+  (reduce #(assoc-in %1 (first %2) (current-hand (second %2))) grid (map vector coordinates hand)))
+
 (defn empty-location? [[x y] grid]
   (let [cell (get-in grid [x y])]
     (or

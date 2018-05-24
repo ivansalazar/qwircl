@@ -1,6 +1,11 @@
 (ns qwircl.turn
   (:require [qwircl.logic :as logic]))
 
+(defn update-positions [{{:keys [hand positions]} :turn :as state} clicked]
+  (assoc-in state 
+            [:turn :positions] 
+            (conj positions {:coordinates clicked :hand (peek hand)})))
+
 ;; push-down automaton for managing state for
 ;; picking and playing tiles
 (defn run-pda 
@@ -25,10 +30,12 @@
        (= action :grid-clicked)
        (= 1 (count hand))
        (not-any? #(= clicked (:coordinates %)) positions)
-       (logic/valid-play? state clicked)) {:turn-state :playing 
-                                       :hand []
-                                       :positions (conj positions {:coordinates clicked
-                                                                 :hand (peek hand)})}
+       (logic/valid-play? 
+        (update-positions state clicked))) {:turn-state :playing 
+                                            :hand []
+                                            :positions (conj positions 
+                                                             {:coordinates clicked
+                                                              :hand (peek hand)})}
       (= action :undo) (cond
                          (and 
                           (= 1 (count hand))

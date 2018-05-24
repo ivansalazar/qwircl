@@ -43,7 +43,10 @@
   (let [click (ui-handlers/translate-event state event)]
     (-> state
         (assoc :turn (player-turn state click))
-        (assoc :debug click))))
+        (assoc :debug {:clicked click 
+                       :turn (player-turn state click)
+                       :game-state (get-in state [:game :game-state])
+}))))
 
 ; this function is called in resources/public/index.html
 (defn ^:export run-sketch []

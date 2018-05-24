@@ -4,9 +4,9 @@
 
 (def side 25)
 (def size 30)
-(def width (* 2 size side))
+(def width (* size side))
 (def height width)
-(def header (* 1.8 size))
+(def header (* 2.5 size))
 
 ;; These represent the dimensions of the different UI components 
 ;; that are clickable or relevant in some other way in the sketch.
@@ -144,7 +144,7 @@
                  (if debug 
                    (str  " debug: " debug)
                    ""))
-            415 30)
+            20 62)
     (q/with-translation ((juxt :x :y) (:hand dimensions))
       (dotimes [x (count hand)]
         (draw-tile x 0 (get hand x))))

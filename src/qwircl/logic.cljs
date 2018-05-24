@@ -26,24 +26,25 @@
 (defn same-color? [grid location tile direction]
   (grid/every-neighbor? #(= (:color tile) (:color %)) grid location direction))
 
-(defn valid-play? [{:keys [grid] 
-                    {:keys [positions hand]} :turn 
-                    {:keys [game-state players]} :game} 
-                   location]
+(defn valid-play? [{:keys [grid]
+                      {:keys [positions]} :turn
+                      {:keys [game-state players]} :game}]
   (let [current-hand (:hand (peek players))
-        previous-grid (grid/with-positions grid positions current-hand)
-        new-grid (grid/with-positions 
-                   grid 
-                   (conj positions {:coordinates location
-                                    :hand (peek hand)})
-                   current-hand)
-        tile (current-hand (first (peek hand)))]
+        previous-grid (grid/with-positions grid (pop positions) current-hand)
+        new-grid (grid/with-positions grid positions current-hand)
+        last-move (peek positions)
+        previous-moves (pop positions)
+        location (last-move :coordinates)
+        tile (-> last-move
+                 :hand
+                 peek ;; to remove this, you need to change grid/with-positions
+                 current-hand)]
     (and 
      (grid/empty-location? location previous-grid)
      (or
       (touches-some-tile? location previous-grid)
       (and (= :initial game-state)
-           (empty? positions)))
+           (empty? previous-moves)))
      (same-line? positions location)
      (and 
       (or 
