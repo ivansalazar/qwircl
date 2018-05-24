@@ -1,6 +1,6 @@
 (ns qwircl.grid-test
   (:require 
-   [qwircl.grid :refer [empty-location? get-neighbors]]
+   [qwircl.grid :refer [empty-location? get-neighbors with-moves]]
    [cljs.test :refer-macros [deftest is]]))
 
 (def grid
@@ -10,6 +10,20 @@
       (assoc-in [5 3] {:color :green :shape :diamond})
       (assoc-in [3 4] {:color :blue :shape :cross})
       (assoc-in [5 4] {:color :blue :shape :diamond})))
+
+(deftest with-moves-test
+  (let [new-grid (vec (repeat 10 (vec (repeat 10 nil))))]
+    (is (=
+         (-> new-grid
+          (assoc-in [0 0] :a)
+          (assoc-in [1 1] :b)
+          (assoc-in [2 2] :c))
+         (with-moves 
+           new-grid 
+           [{:coordinates [0 0] :hand 0}
+            {:coordinates [1 1] :hand 1}
+            {:coordinates [2 2] :hand 2}]
+           [:a :b :c])))))
 
 (deftest empty-location-test
   (is (empty-location? [0 0] grid))

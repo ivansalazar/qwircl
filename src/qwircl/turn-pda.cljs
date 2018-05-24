@@ -1,59 +1,53 @@
 (ns qwircl.turn
   (:require [qwircl.logic :as logic]))
 
-(defn update-positions [{{:keys [hand positions]} :turn :as state} clicked]
-  (assoc-in state 
-            [:turn :positions] 
-            (conj positions {:coordinates clicked :hand (peek hand)})))
+(defn add-move [moves location hand]
+  (conj moves {:coordinates location :hand (peek hand)}))
 
 ;; push-down automaton for managing state for
 ;; picking and playing tiles
 (defn run-pda 
-  [{{:keys [turn-state hand positions]} :turn :as state} {:keys [action clicked]}]
+  [{{:keys [turn-state hand moves]} :turn :as state} {:keys [action clicked]}]
   (case turn-state
     :initial 
     (cond
-      (= action :hand-clicked) {:turn-state :picking :hand [clicked] :positions []}
+      (= action :hand-clicked) {:turn-state :picking :hand [clicked] :moves []}
       :else {:turn-state :initial})
     :picking 
     (cond
       (and 
        (= action :hand-clicked)
-       (empty? positions)
+       (empty? moves)
        (not-any? #(= clicked %) hand)) {:turn-state :picking 
                                         :hand (conj hand clicked)
-                                        :positions []}
+                                        :moves []}
       (and
        (= action :trade)
-       (empty? positions)) {:turn-state :traded :hand hand}
+       (empty? moves)) {:turn-state :traded :hand hand}
       (and
        (= action :grid-clicked)
        (= 1 (count hand))
-       (not-any? #(= clicked (:coordinates %)) positions)
-       (logic/valid-play? 
-        (update-positions state clicked))) {:turn-state :playing 
-                                            :hand []
-                                            :positions (conj positions 
-                                                             {:coordinates clicked
-                                                              :hand (peek hand)})}
+       (not-any? #(= clicked (:coordinates %)) moves)
+       (logic/valid-play? (assoc-in state [:turn :moves] (add-move moves clicked hand)))) 
+      {:turn-state :playing :hand [] :moves (add-move moves clicked hand)}
       (= action :undo) (cond
                          (and 
                           (= 1 (count hand))
-                          (empty? positions)) {:turn-state :initial}
-                         (empty? positions) {:turn-state :picking
-                                             :hand (pop hand)
-                                             :positions positions}
-                         :else {:turn-state :playing :hand (pop hand) :positions positions})
-      :else {:turn-state :picking :hand hand :positions positions})
+                          (empty? moves)) {:turn-state :initial}
+                         (empty? moves) {:turn-state :picking
+                                         :hand (pop hand)
+                                         :moves moves}
+                         :else {:turn-state :playing :hand (pop hand) :moves moves})
+      :else {:turn-state :picking :hand hand :moves moves})
     :playing
     (cond
       (and
        (= action :hand-clicked)
-       (not-any? #(= clicked (:hand %)) positions)) {:turn-state :picking 
-                                                     :hand (conj hand clicked)
-                                                     :positions positions}
-      (= action :undo) (if (= 1 (count positions))
+       (not-any? #(= clicked (:hand %)) moves)) {:turn-state :picking 
+                                                 :hand (conj hand clicked)
+                                                 :moves moves}
+      (= action :undo) (if (= 1 (count moves))
                          {:turn-state :initial}
-                         {:turn-state :playing :hand hand :positions (pop positions)})
-      (= action :submit) {:turn-state :played :positions positions}
-      :else {:turn-state :playing :hand hand :positions positions})))
+                         {:turn-state :playing :hand hand :moves (pop moves)})
+      (= action :submit) {:turn-state :played :moves moves}
+      :else {:turn-state :playing :hand hand :moves moves})))

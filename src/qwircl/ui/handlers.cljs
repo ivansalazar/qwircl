@@ -13,7 +13,7 @@
 (defn translate-hand [xp hand]
   (let [x (int (/ (- xp (get-in ui/dimensions [:hand :x])) ui/size))]
     (when (and (<= 0 x) (< x (count hand)))
-      [x])))
+      x)))
 
 (defn translate-grid [x y]
   [(int (/ x ui/size)) (int (/ (- y ui/header) ui/size))])

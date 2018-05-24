@@ -107,11 +107,11 @@
                :undo :active
                :inactive)))
 
-(defn button-action [button {:keys [turn-state positions]}]
+(defn button-action [button {:keys [turn-state moves]}]
   (case button
     :undo :undo
     :submit (case turn-state
-              :picking (if (empty? positions) 
+              :picking (if (empty? moves) 
                          :trade
                          :submit)
               :playing :submit
@@ -172,18 +172,18 @@
         (draw-empty-space x y)))))
 
 (defn draw-turn 
-  [{{:keys [turn-state hand positions]} :turn {:keys [players]} :game :as state}] 
+  [{{:keys [turn-state hand moves]} :turn {:keys [players]} :game :as state}] 
   (let [current-hand (:hand (peek players))]
     (q/with-translation ((juxt :x :y) (:hand dimensions))
-      (doseq [[h] hand]
+      (doseq [h hand]
         (draw-empty-space h 0)
         (as-> (current-hand h) arg
           (assoc arg :highlighted? true)
           (draw-tile h 0 arg)))
-      (doseq [{[h] :hand} positions]
+      (doseq [{h :hand} moves]
         (draw-empty-space h 0)))
     (q/with-translation [0 header]
-      (doseq [{[x y] :coordinates [h] :hand} positions]
+      (doseq [{[x y] :coordinates h :hand} moves]
         (let [tile (current-hand h)]
           (draw-tile x y (assoc tile :highlighted? true)))))))
 
