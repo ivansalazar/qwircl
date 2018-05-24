@@ -1,8 +1,8 @@
 (ns ^:figwheel-always qwircl.test-runner
   (:require 
    [cljs.test :as test :include-macros true :refer [report]]
-   [figwheel.client :as fw]
-   [qwircl.core-test]))
+   [qwircl.core-test]
+   [figwheel.client :as fw]))
 
 ;; Runner code derived from
 ;; https://github.com/bhauman/crashverse/blob/master/test/crashverse/test_runner.cljs
@@ -35,10 +35,12 @@
   (println "\n#############################"))
 
 (defn runner []
-  (test/run-all-tests #"qwircl.*"))
+ ;  (test/run-all-tests)
+ (test/run-all-tests #"qwircl.*")
+ ;  (test/run-tests 'qwircl.core-test)
+  )
 
 (fw/start {
            :websocket-url "ws://localhost:3449/figwheel-ws"
-           ;; :autoload false
            :build-id "test"
            :on-jsload (fn [] (runner))})

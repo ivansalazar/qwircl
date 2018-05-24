@@ -18,11 +18,15 @@
 (defn translate-grid [x y]
   [(int (/ x ui/size)) (int (/ (- y ui/header) ui/size))])
 
-(defn translate-event [{{my-hand :hand} :my} {:keys [x y] :as event}]
-  (case (get-clicked x y)
-    :hand (when-let [h (translate-hand x my-hand)] 
-            {:action :hand-clicked :clicked h})
-    :grid {:action :grid-clicked :clicked (translate-grid x y)}
-    :submit {:action :submit}
-    :undo {:action :undo}
-    event))
+(defn translate-event 
+  [{:keys [turn] {:keys [players] :as game} :game} {:keys [x y] :as event}]
+  (let [current-hand (:hand (peek players))]
+    (case (get-clicked x y)
+      :hand (when-let [h (translate-hand x current-hand)] 
+              {:action :hand-clicked :clicked h})
+      :grid {:action :grid-clicked :clicked (translate-grid x y)}
+      :submit {:action (ui/button-action :submit turn)
+               :status (ui/button-status :submit turn game)}
+      :undo {:action :undo
+             :status (ui/button-status :undo turn game)}
+      event)))

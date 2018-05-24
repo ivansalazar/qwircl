@@ -6,24 +6,43 @@
             [quil.middleware :as m]))
 
 (defn setup []
-  {:grid (-> (vec (repeat ui/side (vec (repeat ui/side nil))))
-                      (assoc-in [3 3] {:color :green :shape :cross})
-                      (assoc-in [4 3] {:color :green :shape :circle})
-                      (assoc-in [5 3] {:color :green :shape :diamond})
-                      (assoc-in [3 4] {:color :blue :shape :cross})
-                      (assoc-in [5 4] {:color :blue :shape :diamond})) 
-            :turn {:s :initial} 
-            :my {:hand [{:color :blue :shape :diamond} 
-                        {:color :blue :shape :circle}
-                        {:color :blue :shape :clover}
-                        {:color :blue :shape :cross}
-                        {:color :orange :shape :cross}]
-                 :name "Name"}})
+  (q/frame-rate 15)
+  {:grid (-> (vec (repeat ui/side (vec (repeat ui/side nil))))) 
+   :turn {:turn-state :initial} 
+   :game {:game-state :initial 
+          :players (conj #queue [{:hand [{:color :blue :shape :diamond} 
+                                         {:color :blue :shape :circle}
+                                         {:color :blue :shape :clover}
+                                         {:color :blue :shape :cross}
+                                         {:color :orange :shape :cross}]
+                                  :id :a
+                                  :name "NameA"}
+                                 {:hand [{:color :blue :shape :diamond} 
+                                         {:color :blue :shape :circle}
+                                         {:color :blue :shape :clover}
+                                         {:color :blue :shape :cross}
+                                         {:color :orange :shape :cross}]
+                                  :id :b
+                                  :name "NameB"}
+                                 {:hand [{:color :blue :shape :diamond} 
+                                         {:color :blue :shape :circle}
+                                         {:color :blue :shape :clover}
+                                         {:color :blue :shape :cross}
+                                         {:color :orange :shape :cross}]
+                                  :id :c
+                                  :name "NameC"}])}})
+
+;; ignores events that come from :inactive ui elements
+;; but runs the player turn otherwise
+(defn player-turn [state click]
+  (if (= :inactive (:status click))
+    (:turn state)
+    (turn/run-pda state click)))
 
 (defn click-event [state event]
   (let [click (ui-handlers/translate-event state event)]
     (-> state
-        (assoc :turn (turn/run-pda state click))
+        (assoc :turn (player-turn state click))
         (assoc :debug click))))
 
 ; this function is called in resources/public/index.html

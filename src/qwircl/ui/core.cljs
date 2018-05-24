@@ -98,20 +98,20 @@
     (q/no-stroke)
     (set-color :background)))
 
-(defn button-status [button turn]
-  (case (:s turn)
+(defn button-status [button {:keys [turn-state]} game]
+  (case turn-state
     :initial :inactive 
     :playing :active
     :picking (case button 
-               :submit :active
+               :submit :inactive
                :undo :active
                :inactive)))
 
-(defn button-action [button turn]
+(defn button-action [button {:keys [turn-state positions]}]
   (case button
     :undo :undo
-    :submit (case (:s turn)
-              :picking (if (empty? (:positions turn)) 
+    :submit (case turn-state
+              :picking (if (empty? positions) 
                          :trade
                          :submit)
               :playing :submit
@@ -124,8 +124,8 @@
 (def text-color
   {:inactive :white
    :active :black})
-(defn draw-button [button x turn]
-  (let [status (button-status button turn)]
+(defn draw-button [button x turn game]
+  (let [status (button-status button turn game)]
     (set-color (button-color status))
     (apply q/rect 
            ((juxt :x :y :w :h :r) (dimensions button)))
@@ -135,19 +135,20 @@
         s/capitalize
         (q/text x 31))))
 
-(defn draw-header [{:keys [turn debug] {:keys [name hand]} :my :as state}]
-  (draw-button :submit 232 turn)
-  (draw-button :undo 340 turn)
-  (set-color :black)
-  (q/text (str "Playing: " name
-               (if debug 
-                 (str  " debug: " debug)
-                 ""))
-          415 30)
-  (q/with-translation ((juxt :x :y) (:hand dimensions))
-    (dotimes [x (count hand)]
-      (draw-tile x 0 (get hand x))))
-  (set-color :background))
+(defn draw-header [{:keys [turn debug] {:keys [players] :as game} :game :as state}]
+  (let [{:keys [name hand]} (peek players)]
+    (draw-button :submit 232 turn game)
+    (draw-button :undo 340 turn game)
+    (set-color :black)
+    (q/text (str "Playing: " name
+                 (if debug 
+                   (str  " debug: " debug)
+                   ""))
+            415 30)
+    (q/with-translation ((juxt :x :y) (:hand dimensions))
+      (dotimes [x (count hand)]
+        (draw-tile x 0 (get hand x))))
+    (set-color :background)))
 
 (defn draw-empty-space 
   ([x y]
@@ -170,19 +171,21 @@
           (draw-empty-space x y (:highlighted? cell)))
         (draw-empty-space x y)))))
 
-(defn draw-turn [{{my-hand :hand} :my {:keys [s hand positions]} :turn :as state}] 
-  (q/with-translation ((juxt :x :y) (:hand dimensions))
-    (doseq [[h] hand]
-      (draw-empty-space h 0)
-      (as-> (my-hand h) arg
-        (assoc arg :highlighted? true)
-        (draw-tile h 0 arg)))
-    (doseq [{[h] :hand} positions]
-      (draw-empty-space h 0)))
-  (q/with-translation [0 header]
-    (doseq [{[x y] :coordinates [h] :hand} positions]
-      (let [tile (my-hand h)]
-        (draw-tile x y (assoc tile :highlighted? true))))))
+(defn draw-turn 
+  [{{:keys [turn-state hand positions]} :turn {:keys [players]} :game :as state}] 
+  (let [current-hand (:hand (peek players))]
+    (q/with-translation ((juxt :x :y) (:hand dimensions))
+      (doseq [[h] hand]
+        (draw-empty-space h 0)
+        (as-> (current-hand h) arg
+          (assoc arg :highlighted? true)
+          (draw-tile h 0 arg)))
+      (doseq [{[h] :hand} positions]
+        (draw-empty-space h 0)))
+    (q/with-translation [0 header]
+      (doseq [{[x y] :coordinates [h] :hand} positions]
+        (let [tile (current-hand h)]
+          (draw-tile x y (assoc tile :highlighted? true)))))))
 
 (defn draw-state [state]
   (q/background 240)
