@@ -45,8 +45,7 @@
         (assoc :turn (player-turn state click))
         (assoc :debug {:clicked click 
                        :turn (player-turn state click)
-                       :game-state (get-in state [:game :game-state])
-}))))
+                       :game-state (get-in state [:game :game-state])}))))
 
 ; this function is called in resources/public/index.html
 (defn ^:export run-sketch []
