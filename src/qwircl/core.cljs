@@ -14,7 +14,8 @@
                                          {:color :blue :shape :circle}
                                          {:color :blue :shape :clover}
                                          {:color :blue :shape :cross}
-                                         {:color :orange :shape :cross}]
+                                         {:color :orange :shape :square}
+                                         {:color :green :shape :star}]
                                   :id :a
                                   :name "NameA"}
                                  {:hand [{:color :blue :shape :diamond} 

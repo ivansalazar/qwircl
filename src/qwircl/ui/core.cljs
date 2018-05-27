@@ -74,30 +74,30 @@
       quarter (* size 0.25)
       eighth (* 0.5 quarter)
       third (/ size 3)]
-  (defmethod draw-shape :clover [tile]
+  (defmethod draw-shape :clover [_]
     (q/ellipse half third quarter quarter)
     (q/ellipse third half quarter quarter)
     (q/ellipse half (* size (/ 2 3)) quarter quarter)
     (q/ellipse (* size (/ 2 3)) half quarter quarter)
     (q/ellipse half half quarter quarter))
-  (defmethod draw-shape :star [tile]
+  (defmethod draw-shape :star [_]
     (q/triangle half 0 
-                size (* 0.75 size)
+                (dec size) (* 0.75 size)
                 0 (* 0.75 size))
-    (q/triangle half size
-                0 quarter
-                size quarter))
-  (defmethod draw-shape :cross [tile]
+    (q/triangle half (dec size)
+                (inc 0) quarter
+                (dec size) quarter))
+  (defmethod draw-shape :cross [_]
     (rect (- half eighth) eighth quarter (- size quarter))
     (rect eighth (- half eighth) (- size quarter) quarter))
-  (defmethod draw-shape :circle [tile]
+  (defmethod draw-shape :circle [_]
     (q/ellipse half half (* 0.75 size) (* 0.75 size)))
-  (defmethod draw-shape :diamond [tile]
+  (defmethod draw-shape :diamond [_]
     (q/quad half quarter 
             (- size quarter) half
             half (- size quarter)
             quarter half))
-  (defmethod draw-shape :square [tile]
+  (defmethod draw-shape :square [_]
     (rect quarter quarter half half)))
 
 (defn draw-tile [x y tile]
