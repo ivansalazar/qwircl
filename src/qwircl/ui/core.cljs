@@ -8,6 +8,12 @@
 (def height width)
 (def header (* 2.5 size))
 
+(defn rect 
+  ([x y w h]
+   (q/rect x y (dec w) (dec h)))
+  ([x y w h r]
+   (q/rect x y (dec w) (dec h) r)))
+
 ;; These represent the dimensions of the different UI components 
 ;; that are clickable or relevant in some other way in the sketch.
 ;; All of them are constant except for the width of the actual hand
@@ -57,11 +63,11 @@
       (set-color :background)
       (q/stroke-weight 2)
       (apply q/stroke (get-color :red))
-      (q/rect (* size x) (* size y) size size 8)
+      (rect (* size x) (* size y) size size 8)
       (q/no-stroke))
     (do 
       (set-color :black)
-      (q/rect (* size x) (* size y) size size))))
+      (rect (* size x) (* size y) size size))))
 
 (defmulti draw-shape :shape)
 (let [half (/ size 2)
@@ -82,8 +88,8 @@
                 0 quarter
                 size quarter))
   (defmethod draw-shape :cross [tile]
-    (q/rect (- half eighth) eighth quarter (- size quarter))
-    (q/rect eighth (- half eighth) (- size quarter) quarter))
+    (rect (- half eighth) eighth quarter (- size quarter))
+    (rect eighth (- half eighth) (- size quarter) quarter))
   (defmethod draw-shape :circle [tile]
     (q/ellipse half half (* 0.75 size) (* 0.75 size)))
   (defmethod draw-shape :diamond [tile]
@@ -92,7 +98,7 @@
             half (- size quarter)
             quarter half))
   (defmethod draw-shape :square [tile]
-    (q/rect quarter quarter half half)))
+    (rect quarter quarter half half)))
 
 (defn draw-tile [x y tile]
   (draw-background x y (:highlighted? tile))
@@ -128,7 +134,7 @@
   (defn draw-button [button x turn game]
     (let [status (button-status button turn game)]
       (set-color (button-color status))
-      (apply q/rect 
+      (apply rect 
              ((juxt :x :y :w :h :r) (dimensions button)))
       (set-color (text-color status))
       (-> (button-action button turn)
@@ -154,7 +160,7 @@
 (defn draw-empty-space 
   ([x y]
    (set-color :background)
-   (q/rect (* size x) (* size y) size size))
+   (rect (* size x) (* size y) size size))
   ([x y highlighted]
    (if highlighted
      (draw-background x y true)
