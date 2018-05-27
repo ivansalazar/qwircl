@@ -37,7 +37,7 @@
 (defn player-turn [state click]
   (if (= :inactive (:status click))
     (:turn state)
-    (turn/run-pda state click)))
+    (turn/run state click)))
 
 (defn click-event [state event]
   (let [click (ui-handlers/translate-event state event)]
