@@ -35,10 +35,7 @@
   (println "\n#############################"))
 
 (defn runner []
- ;  (test/run-all-tests)
- (test/run-all-tests #"qwircl.*")
- ;  (test/run-tests 'qwircl.core-test)
-  )
+ (test/run-all-tests #"qwircl.*"))
 
 (fw/start {
            :websocket-url "ws://localhost:3449/figwheel-ws"
