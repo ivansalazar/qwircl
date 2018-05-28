@@ -1,49 +1,49 @@
 (ns qwircl.turn
   (:require [qwircl.logic :as logic]))
 
+(defn- add-move [moves location hand]
+  (conj moves {:coordinates location :hand (peek hand)}))
+
 ;; push-down automaton for managing state for
 ;; picking and playing tiles
-(defn run-pda 
-  [{{:keys [s hand positions]} :turn :as state} {:keys [action clicked]}]
-  (case s
-    :initial 
-    (cond
-      (= action :hand-clicked) {:s :picking :hand [clicked] :positions []}
-      :else {:s :initial})
-    :picking 
+(defn run
+  [{{:keys [turn-state hand moves]} :turn :as state} {:keys [action clicked]}]
+  (defmulti => (fn [turn-state action] [turn-state action]))
+  (defmethod => :default [_ _]
+    {:turn-state turn-state :hand hand :moves moves})
+  (defmethod => [:initial :hand-clicked] [_ _]
+    {:turn-state :picking :hand [clicked] :moves []})
+  (defmethod => [:picking :hand-clicked] [_ _]
+    (if (and (empty? moves) (not-any? #(= clicked %) hand))
+      {:turn-state :picking :hand (conj hand clicked) :moves []}
+      (=> :default)))
+  (defmethod => [:picking :trade] [_ _]
+    (if (empty? moves)
+      {:turn-state :traded :hand hand}
+      (=> :default)))
+  (defmethod => [:picking :grid-clicked] [_ _]
+    (if (and (= 1 (count hand))
+             (not-any? #(= clicked (:coordinates %)) moves)
+             (logic/valid-play? (assoc-in state
+                                          [:turn :moves] 
+                                          (add-move moves clicked hand)))) 
+      {:turn-state :playing :hand [] :moves (add-move moves clicked hand)}
+      (=> :default)))
+  (defmethod => [:picking :undo] [_ _]
     (cond
       (and 
-       (= action :hand-clicked)
-       (empty? positions)
-       (not-any? #(= clicked %) hand)) {:s :picking 
-                                        :hand (conj hand clicked)
-                                        :positions []}
-      (and
-       (= action :trade-clicked)
-       (empty? positions)) {:s :traded :hand hand}
-      (and
-       (= action :grid-clicked)
        (= 1 (count hand))
-       (not-any? #(= clicked (:coordinates %)) positions)
-       (logic/valid-play? state clicked)) {:s :playing 
-                                       :hand []
-                                       :positions (conj positions {:coordinates clicked
-                                                                 :hand (peek hand)})}
-      (= action :undo) (cond
-                         (and 
-                          (= 1 (count hand))
-                          (empty? positions)) {:s :initial}
-                         :else {:s :playing :hand (pop hand) :positions positions})
-      :else {:s :picking :hand hand :positions positions})
-    :playing
-    (cond
-      (and
-       (= action :hand-clicked)
-       (not-any? #(= clicked (:hand %)) positions)) {:s :picking 
-                                                     :hand (conj hand clicked)
-                                                     :positions positions}
-      (= action :play-clicked) {:s :played :positions positions}
-      (= action :undo) (if (= 1 (count positions))
-                         {:s :initial}
-                         {:s :playing :hand hand :positions (pop positions)})
-      :else {:s :playing :hand hand :positions positions})))
+       (empty? moves)) {:turn-state :initial}
+      (empty? moves) {:turn-state :picking :hand (pop hand) :moves moves}
+      :else {:turn-state :playing :hand (pop hand) :moves moves}))
+  (defmethod => [:playing :hand-clicked] [_ _]
+    (if (not-any? #(= clicked (:hand %)) moves)
+      {:turn-state :picking :hand (conj hand clicked) :moves moves}
+      (=> :default)))
+  (defmethod => [:playing :undo] [_ _]
+    (if (= 1 (count moves))
+      {:turn-state :initial}
+      {:turn-state :playing :hand hand :moves (pop moves)}))
+  (defmethod => [:playing :submit] [_ _]
+    {:turn-state :played :moves moves})
+  (=> turn-state action))

@@ -8,12 +8,12 @@
         rc [(inc x) y]]
     (some #(get-in grid %) [uc dc lc rc])))
 
-(defn same-line? [positions [x y]]
-  (or (empty? positions)
+(defn same-line? [moves [x y]]
+  (or (empty? moves)
       (every? #(= (first (:coordinates %)) x)
-              positions)
+              moves)
       (every? #(= (second (:coordinates %)) y) 
-              positions)))
+              moves)))
 
 (defn all-unique? [grid location tile direction]
   (let [ts (conj (grid/get-neighbors grid location direction) tile)]
@@ -26,19 +26,25 @@
 (defn same-color? [grid location tile direction]
   (grid/every-neighbor? #(= (:color tile) (:color %)) grid location direction))
 
-(defn valid-play? 
-  [{:keys [grid] {:keys [positions hand]} :turn {my-hand :hand} :my} location]
-  (let [previous-grid (grid/with-positions grid positions my-hand)
-        new-grid (grid/with-positions 
-                   grid 
-                   (conj positions {:coordinates location
-                                    :hand (peek hand)})
-                   my-hand)
-        tile (my-hand (first (peek hand)))]
+(defn valid-play? [{:keys [grid]
+                      {:keys [moves]} :turn
+                      {:keys [game-state players]} :game}]
+  (let [current-hand (:hand (peek players))
+        previous-grid (grid/with-moves grid (pop moves) current-hand)
+        new-grid (grid/with-moves grid moves current-hand)
+        last-move (peek moves)
+        previous-moves (pop moves)
+        location (last-move :coordinates)
+        tile (-> last-move
+                 :hand
+                 current-hand)]
     (and 
      (grid/empty-location? location previous-grid)
-     (touches-some-tile? location previous-grid)
-     (same-line? positions location)
+     (or
+      (touches-some-tile? location previous-grid)
+      (and (= :initial game-state)
+           (empty? previous-moves)))
+     (same-line? moves location)
      (and 
       (or 
        (same-shape? new-grid location tile :vertical)
